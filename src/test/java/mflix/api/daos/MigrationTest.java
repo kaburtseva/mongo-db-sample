@@ -20,7 +20,7 @@ public class MigrationTest extends TicketTest {
   @Before
   public void setup() throws IOException {
     String mongoUri = getProperty("spring.mongodb.uri");
-    movies = MongoClients.create(mongoUri).getDatabase("sample_mflix").getCollection("movies");
+    movies = MongoClients.create(mongoUri).getDatabase("mflix").getCollection("movies");
   }
 
   @Test
@@ -29,9 +29,9 @@ public class MigrationTest extends TicketTest {
 
     int expectedCount = 0;
     Assert.assertEquals(
-        "Should not find documents where `lastupdated` is of " + "`string` type",
-        expectedCount,
-        movies.countDocuments(filter));
+            "Should not find documents where `lastupdated` is of " + "`string` type",
+            expectedCount,
+            movies.countDocuments(filter));
   }
 
   @Test
@@ -40,8 +40,8 @@ public class MigrationTest extends TicketTest {
 
     int expectedCount = 0;
     Assert.assertEquals(
-        "Should not find documents where `imdb.rating` is of" + " not of `number` type",
-        expectedCount,
-        movies.countDocuments(filter));
+            "Should not find documents where `imdb.rating` is of" + " not of `number` type",
+            expectedCount,
+            movies.countDocuments(filter));
   }
 }

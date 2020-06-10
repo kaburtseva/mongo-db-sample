@@ -1,5 +1,6 @@
 package mflix.api.models;
 
+import org.bson.Document;
 import org.bson.codecs.pojo.annotations.BsonProperty;
 
 public class Session {

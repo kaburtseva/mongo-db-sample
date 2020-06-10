@@ -10,14 +10,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 
-import static com.mongodb.client.model.Filters.all;
-import static com.mongodb.client.model.Filters.in;
+import static com.mongodb.client.model.Aggregates.*;
+import static com.mongodb.client.model.Filters.*;
 import static com.mongodb.client.model.Projections.fields;
 import static com.mongodb.client.model.Projections.include;
+import static com.mongodb.client.model.Sorts.descending;
 
 @Component
 public class MovieDao extends AbstractMFlixDao {
@@ -35,8 +34,21 @@ public class MovieDao extends AbstractMFlixDao {
 
     @SuppressWarnings("unchecked")
     private Bson buildLookupStage() {
-        return null;
+        String from = "comments";
+        String as = "comments";
 
+        Variable<String> let = new Variable<String>("id", "$_id");
+
+        Document eq = Document.parse("{'$eq':['$movie_id','$$id']}");
+        Bson match = match(expr(eq));
+        Bson sort = sort(descending("date")); //fix from forum
+
+        return lookup(
+                from,                       //from
+                Arrays.asList(let),         //let
+                Arrays.asList(match, sort), //pipeline
+                as                          //as
+        );
     }
 
     /**
@@ -50,7 +62,8 @@ public class MovieDao extends AbstractMFlixDao {
         //TODO> Ticket: Handling Errors - implement a way to catch a
         //any potential exceptions thrown while validating a movie id.
         //Check out this method's use in the method that follows.
-        return true;
+
+        return Objects.nonNull(movieId) && ObjectId.isValid(movieId);
     }
 
     /**
@@ -68,9 +81,10 @@ public class MovieDao extends AbstractMFlixDao {
         List<Bson> pipeline = new ArrayList<>();
         // match stage to find movie
         Bson match = Aggregates.match(Filters.eq("_id", new ObjectId(movieId)));
+        Bson joinWithComments = buildLookupStage();
         pipeline.add(match);
-        // TODO> Ticket: Get Comments - implement the lookup stage that allows the comments to
-        // retrieved with Movies.
+        pipeline.add(joinWithComments);
+
         Document movie = moviesCollection.aggregate(pipeline).first();
 
         return movie;
@@ -122,7 +136,9 @@ public class MovieDao extends AbstractMFlixDao {
      * @return List of matching Document objects.
      */
     public List<Document> getMoviesByCountry(String... country) {
+
         List<Document> movies = new ArrayList<>();
+
         Bson queryFilter = all("countries", country);
         Bson projection = fields(include("title"));
 
@@ -170,9 +186,12 @@ public class MovieDao extends AbstractMFlixDao {
      * @return List of documents sorted by sortKey that match the cast selector.
      */
     public List<Document> getMoviesByCast(String sortKey, int limit, int skip, String... cast) {
+
+        List<Document> movies = new ArrayList<>();
+
         Bson castFilter = in("cast", cast);
         Bson sort = Sorts.descending(sortKey);
-        List<Document> movies = new ArrayList<>();
+
         moviesCollection
                 .find(castFilter)
                 .sort(sort)
@@ -180,6 +199,7 @@ public class MovieDao extends AbstractMFlixDao {
                 .skip(skip)
                 .iterator()
                 .forEachRemaining(movies::add);
+
         return movies;
     }
 
@@ -194,11 +214,12 @@ public class MovieDao extends AbstractMFlixDao {
      */
     public List<Document> getMoviesByGenre(String sortKey, int limit, int skip, String... genres) {
         // query filter
-        Bson castFilter = in("genres", genres);
+        Bson castFilter = Filters.in("genres", genres);
         // sort key
         Bson sort = Sorts.descending(sortKey);
+
         List<Document> movies = new ArrayList<>();
-        // pagination like skip and limit in the code below
+
         moviesCollection
                 .find(castFilter)
                 .sort(sort)
@@ -206,6 +227,7 @@ public class MovieDao extends AbstractMFlixDao {
                 .skip(skip)
                 .iterator()
                 .forEachRemaining(movies::add);
+
         return movies;
     }
 
@@ -274,13 +296,12 @@ public class MovieDao extends AbstractMFlixDao {
         List<Document> movies = new ArrayList<>();
         String sortKey = "tomatoes.viewer.numReviews";
         Bson skipStage = Aggregates.skip(skip);
-        Bson matchStage = Aggregates.match(in("cast", cast));
+        Bson matchStage = Aggregates.match(Filters.in("cast", cast));
         Bson sortStage = Aggregates.sort(Sorts.descending(sortKey));
         Bson limitStage = Aggregates.limit(limit);
         Bson facetStage = buildFacetStage();
         // Using a LinkedList to ensure insertion order
         List<Bson> pipeline = new LinkedList<>();
-
         // correct order
         // Your job is to order the stages correctly in the pipeline.
         // Starting with the `matchStage` add the remaining stages.
@@ -335,7 +356,7 @@ public class MovieDao extends AbstractMFlixDao {
      * @return number of matching documents.
      */
     public long getCastSearchCount(String... cast) {
-        return this.moviesCollection.countDocuments(in("cast", cast));
+        return this.moviesCollection.countDocuments(Filters.in("cast", cast));
     }
 
     /**
@@ -345,6 +366,6 @@ public class MovieDao extends AbstractMFlixDao {
      * @return number of matching documents.
      */
     public long getGenresSearchCount(String... genres) {
-        return this.moviesCollection.countDocuments(in("genres", genres));
+        return this.moviesCollection.countDocuments(Filters.in("genres", genres));
     }
 }
